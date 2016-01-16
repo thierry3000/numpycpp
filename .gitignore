@@ -16,6 +16,9 @@ trash
 *.kate-swp
 *.swp # create by vim
 
+htmldoc
+doc/Data
+
 #CMake stuff
 CMakeCache.txt
 CMakeFiles

@@ -10,6 +10,11 @@
 struct tagPyArrayObject;
 typedef tagPyArrayObject PyArrayObject;
 
+/*
+Namespace: boost::python::numeric
+
+The namespace where the classes of this library are found.
+*/
 namespace boost { namespace python { namespace numeric {
 
 namespace mw_py_impl
@@ -64,7 +69,14 @@ enum {
 template<class T>
 bool isCompatibleType(int id);
 
+/*
+Class: arraytbase
 
+This is a naturaldocs documentation test
+
+See Also:
+  <arrayt>
+*/
 class arraytbase
 { 
 protected:

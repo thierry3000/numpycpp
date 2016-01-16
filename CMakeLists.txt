@@ -17,6 +17,11 @@ find_package(NumPy REQUIRED)
 #for manual configuration, set PYTHON_INCLUDE_DIR and PYTHON_LIBRARY
 #see also do-configure-tumorcode-lusi.sh script
 
+add_custom_target(docs ALL
+                  COMMAND naturaldocs -i . -p doc -xi doc -xi htmldoc -o HTML htmldoc
+                  WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+                  SOURCES numpy.hpp)
+
 message(STATUS "PYTHON include dirs = ${PYTHON_INCLUDE_DIRS}")
 message(STATUS "PYTHON libs         = ${PYTHON_LIBRARIES}")
 message(STATUS "NumPy include dirs  = ${PYTHON_NUMPY_INCLUDE_DIR}")
