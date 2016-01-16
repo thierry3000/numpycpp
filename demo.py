@@ -38,19 +38,20 @@ print ('PRINTING CONVERTED ARRAY:')
 a = np.arange(2*3*4, dtype = np.int32).reshape(2,3,4)
 libdemo.printConvertedArray_int(a)
 
-print ('TESTING SCALAR CONVERSION:')
-inttypes = [np.int8, np.byte, np.short, np.int16, np.int, np.long, np.int32, np.int64, np.longlong, np.uint8, np.ubyte, np.ushort, np.uint16, np.uint, np.uint32, np.uint64, np.ulonglong]
-for dt in inttypes:
-  a = np.asarray((42,), dtype = dt)[0]
-  print dt,':',
-  libdemo.print_int(a)
-  print ''
 
-floattypes = [np.float, np.float32, np.double, np.float64]
-for dt in floattypes:
+def wrap_to_str(f):
+  def wrapper(x):
+    try:
+      return f(x)
+    except:
+      return 'ERR'
+  return wrapper
+
+for fun in [libdemo.int_to_str, libdemo.char_to_str, libdemo.float_to_str, libdemo.double_to_str]:
+  locals()[fun.__name__] = wrap_to_str(fun)
+
+print ('TESTING SCALAR CONVERSION:')
+types = [np.int8, np.byte, np.short, np.int16, np.int, np.long, np.int32, np.int64, np.longlong, np.uint8, np.ubyte, np.ushort, np.uint16, np.uint, np.uint32, np.uint64, np.ulonglong, np.float, np.float32, np.double, np.float64]
+for dt in types:
   a = np.asarray((42,), dtype = dt)[0]
-  print dt,':',
-  libdemo.print_float(a)
-  print ',',
-  libdemo.print_double(a)
-  print ''
+  print ('%s: as int: %s, as char: %s, as float: %s, as double: %s' % (str(dt), int_to_str(a), char_to_str(a), float_to_str(a), double_to_str(a)))

@@ -27,7 +27,7 @@ void importNumpyAndRegisterTypes();
 template<class T>
 int getItemtype()
 {
-  enum { S = sizeof(mw_py_impl::incomplete<T>) }; // will generate an error
+  enum { S = sizeof(mw_py_impl::incomplete<T>) }; // will generate an error for types for which getItemtype was not implemented!
   return -1;
 }
 

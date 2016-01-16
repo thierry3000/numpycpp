@@ -1,4 +1,5 @@
 #include <iostream> 
+#include <sstream>
 #include <boost/python/object.hpp>
 //#include <boost/python/tuple.hpp>
 //#include <boost/python/str.hpp>
@@ -129,9 +130,19 @@ void printConvertedArray(np::arrayt<T> arr)
 }
 
 template<class T>
-void print_stdout(const T &x)
+std::string scalar_to_str(const T &x)
 {
-  cout << x;
+  std::ostringstream os;
+  os << x;
+  return os.str();
+}
+
+template<>
+std::string scalar_to_str(const char &x)
+{
+  std::ostringstream os;
+  os << (int)x;
+  return os.str();
 }
 
 
@@ -140,9 +151,10 @@ BOOST_PYTHON_MODULE(libdemo)
   np::importNumpyAndRegisterTypes();
   py::def("printArray", printArray);
   py::def("printConvertedArray_int", printConvertedArray<int>);
-  py::def("print_int", print_stdout<int>);
-  py::def("print_float", print_stdout<float>);
-  py::def("print_double", print_stdout<double>);
+  py::def("char_to_str", scalar_to_str<char>);
+  py::def("int_to_str", scalar_to_str<int>);
+  py::def("float_to_str", scalar_to_str<float>);
+  py::def("double_to_str", scalar_to_str<double>);
 }
 
 
