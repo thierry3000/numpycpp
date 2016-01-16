@@ -7,6 +7,9 @@
 //#include <boost/mpl/int.hpp>
 #include "assert.h"
 
+struct tagPyArrayObject;
+typedef tagPyArrayObject PyArrayObject;
+
 namespace boost { namespace python { namespace numeric {
 
 namespace mw_py_impl
@@ -18,9 +21,8 @@ namespace mw_py_impl
 
   
 void importNumpyAndRegisterTypes();
-  
-enum { MAX_DIM = 32 };
-  
+
+
 // see here http://stackoverflow.com/questions/16454987/c-generate-a-compile-error-if-user-tries-to-instantiate-a-class-template-wiho
 template<class T>
 int getItemtype()
@@ -48,77 +50,109 @@ NUMPY_HPP_FWD_DECLARE_GET_ITEMTYPE(unsigned char)
 NUMPY_HPP_FWD_DECLARE_GET_ITEMTYPE(unsigned long long)
 #undef NUMPY_HPP_FWD_DECLARE_GET_ITEMTYPE
 
+typedef Py_ssize_t ssize_t;
 
-array zeros(int rank, const int *dims, int type);
-array empty(int rank, const int *dims, int type);
+array zeros(int rank, const Py_ssize_t *dims, int type);
+array empty(int rank, const Py_ssize_t *dims, int type);
 
 int getItemtype(const array &arr);
 
+enum {
+  MAX_DIM = 32
+};
+
 template<class T>
 bool isCompatibleType(int id);
+
 
 class arraytbase
 { 
 protected:
   array obj; // the object
-  int r, itemsize_, itemtype_; // rank
-  int m[MAX_DIM],s[MAX_DIM]; // strides and size
-  unsigned char* bytes_; // data
-  bool is_ok_;
+  PyArrayObject* objptr;
+  
+  arraytbase(object const &a, int typesize);
+  void construct(object const &a, int typesize);
 
 public:
-  arraytbase();
-  arraytbase(object const &a);
+  arraytbase(object const &a = object());
+  typedef Py_ssize_t index_t;
   
-  const int* shape() const { return s; }
-  int itemtype() const { return itemtype_; }
-  int itemsize() const { return itemsize_; }
-  int rank() const { return r; }
-  const int* strides() const { return m; } // in number of bytes, *not* number of items!
+  const Py_ssize_t* shape() const; // in number of bytes, *not* number of items!
+  const Py_ssize_t* dims() const { return shape(); }
+  const Py_ssize_t* strides() const; // in number of bytes, *not* number of items!
+  int itemtype() const;
+  int itemsize() const;
+  int rank() const;
+  int ndim() const { return rank(); }
   bool isWriteable() const;
   bool isCContiguous() const;
   bool isFContiguous() const;
   const array& getObject() const { return obj; }
+
+#define NUMPY_HPP_OFFSET1 \
+  x*m[0]
+#define NUMPY_HPP_OFFSET2 \
+  NUMPY_HPP_OFFSET1 + y*m[1]
+#define NUMPY_HPP_OFFSET3 \
+  NUMPY_HPP_OFFSET2 + z*m[2]
+#define NUMPY_HPP_OFFSET4 \
+  NUMPY_HPP_OFFSET3 + w*m[3]
   
-  inline int offset(int x) const
+  inline Py_ssize_t offset(int x) const
   {
-    assert((unsigned int)x<s[0]);
-    return x*m[0];
+    const Py_ssize_t* m = strides();
+    assert((unsigned int)x<shape()[0]);
+    return NUMPY_HPP_OFFSET1;
   }
   
-  inline int offset(int x, int y) const
+  inline Py_ssize_t offset(int x, int y) const
   {
-    assert((unsigned int)y<s[1]);
-    return offset(x) + y*m[1];
+    const Py_ssize_t* m = strides();
+    assert((Py_ssize_t)x<shape()[0]);
+    assert((Py_ssize_t)y<shape()[1]);
+    return NUMPY_HPP_OFFSET2;
   }
   
-  inline int offset(int x, int y, int z) const
+  inline Py_ssize_t offset(int x, int y, int z) const
   {
-    assert((unsigned int)z<s[2]);
-    return offset(x,y) + z*m[2];
+    const Py_ssize_t* m = strides();
+    assert((Py_ssize_t)x<shape()[0]);
+    assert((Py_ssize_t)y<shape()[1]);
+    assert((Py_ssize_t)z<shape()[2]);
+    return NUMPY_HPP_OFFSET3;
   }
   
-  inline int offset(int x,int y, int z, int w) const
+  inline Py_ssize_t offset(int x,int y, int z, int w) const
   {
-    assert((unsigned int)w<s[3]);
-    return offset(x,y,z) + w*m[3];
+    const Py_ssize_t* m = strides();
+    assert((Py_ssize_t)x<shape()[0]);
+    assert((Py_ssize_t)y<shape()[1]);
+    assert((Py_ssize_t)z<shape()[2]);
+    assert((Py_ssize_t)w<shape()[3]);
+    return NUMPY_HPP_OFFSET4;
   }
 
-  inline int offset(const int *c) const
+  inline Py_ssize_t offset(const int *c) const
   {
-    int q = 0;
+    const Py_ssize_t* m = strides();
+    int r = rank();
+    Py_ssize_t q = 0;
     for(int i=0; i<r; ++i)
     {
-      assert((unsigned int)(c[i])<s[i]);
+      assert((Py_ssize_t)(c[i])<shape()[i]);
       q += c[i]*m[i];
     }
     return q;
   }
 
-  unsigned char* bytes()
-  {
-    return bytes_;
-  }
+#undef NUMPY_HPP_OFFSET1
+#undef NUMPY_HPP_OFFSET2
+#undef NUMPY_HPP_OFFSET3
+#undef NUMPY_HPP_OFFSET4
+  
+  char* bytes();
+  const char* bytes() const { return const_cast<arraytbase*>(this)->bytes(); }
 };
 
 
@@ -127,15 +161,11 @@ class arrayt : public arraytbase
 {
 public:
   arrayt() : arraytbase() {}
-  arrayt(arraytbase const &a) : arraytbase(a.getObject()) 
+  arrayt(arraytbase const &a) : arraytbase(a.getObject(), sizeof(T)) 
   {
-    if (sizeof(T) != arraytbase::itemsize())
-      throw std::invalid_argument("arrayt: array itemsize does not match template argument");
   }
-  arrayt(object const &a) : arraytbase(a)
+  arrayt(object const &a) : arraytbase(a, sizeof(T))
   {
-    if (sizeof(T) != arraytbase::itemsize())
-      throw std::invalid_argument("arrayt: array itemsize does not match template argument");
   }
 
   void init(object const &a_)
@@ -146,32 +176,32 @@ public:
 
   T& operator()(int x)
   {
-    return *((T*)(arraytbase::bytes_+offset(x)));
+    return *((T*)(arraytbase::bytes()+offset(x)));
   }
   
   T& operator()(int x, int y)
   {
-    return *((T*)(arraytbase::bytes_+offset(x,y)));
+    return *((T*)(arraytbase::bytes()+offset(x,y)));
   }
   
   T& operator()(int x, int y, int z)
   {
-    return *((T*)(arraytbase::bytes_+offset(x,y,z)));
+    return *((T*)(arraytbase::bytes()+offset(x,y,z)));
   }
   
   T& operator()(int x, int y, int z, int w)
   {
-    return *((T*)(arraytbase::bytes_+offset(x,y,z,w)));
+    return *((T*)(arraytbase::bytes()+offset(x,y,z,w)));
   }
   
   T& operator()(int *c)
   {
-    return *((T*)(arraytbase::bytes_+offset(c)));
+    return *((T*)(arraytbase::bytes()+offset(c)));
   }
   
   T& operator[](int i)
   {
-    return *((T*)(arraytbase::bytes_+offset(i, 0, 0, 0)));
+    return *((T*)(arraytbase::bytes()+offset(i)));
   }
 
   T* data() { return reinterpret_cast<T*>(bytes()); }
@@ -179,32 +209,32 @@ public:
   
   T operator()(int x) const
   {
-    return *((T*)(arraytbase::bytes_+offset(x)));
+    return *((T*)(arraytbase::bytes()+offset(x)));
   }
   
   T operator()(int x, int y) const
   {
-    return *((T*)(arraytbase::bytes_+offset(x,y)));
+    return *((T*)(arraytbase::bytes()+offset(x,y)));
   }
   
   T operator()(int x, int y, int z) const
   {
-    return *((T*)(arraytbase::bytes_+offset(x,y,z)));
+    return *((T*)(arraytbase::bytes()+offset(x,y,z)));
   }
   
   T operator()(int x, int y, int z, int w) const
   {
-    return *((T*)(arraytbase::bytes_+offset(x,y,z,w)));
+    return *((T*)(arraytbase::bytes()+offset(x,y,z,w)));
   }
   
   T operator()(int *c) const
   {
-    return *((T*)(arraytbase::bytes_+offset(c)));
+    return *((T*)(arraytbase::bytes()+offset(c)));
   }
   
   T operator[](int i) const
   {
-    return *((T*)(arraytbase::bytes_+offset(i, 0, 0, 0)));
+    return *((T*)(arraytbase::bytes()+offset(i)));
   }
   
   const T* data() const { return reinterpret_cast<T*>(bytes()); }
@@ -214,27 +244,35 @@ public:
 namespace mw_py_impl
 {
 
-template<class T>
-inline void gridded_data_ccons(T* dst, const T* src, const int* dims, const int *dst_strides, const int *src_strides, boost::mpl::int_<0>)
-{
-  for (int i=0; i<dims[0]; ++i)
+  template<class T, class Idx1, class Idx2, class Idx3>
+  inline void gridded_data_ccons(T* dst, const T* src, 
+                                 const Idx1 *dims, 
+                                 const Idx2 *dst_strides, 
+                                 const Idx3 *src_strides, 
+                                 boost::mpl::int_<0>)
   {
-    new (dst) T(*src);
-    dst += dst_strides[0];
-    src += src_strides[0];
+    for (int i=0; i<dims[0]; ++i)
+    {
+      new (dst) T(*src);
+      dst += dst_strides[0];
+      src += src_strides[0];
+    }
   }
-}
-
-template<class T, int dim>
-inline void gridded_data_ccons(T* dst, const T* src, const int* dims, const int *dst_strides, const int *src_strides, boost::mpl::int_<dim>)
-{
-  for (int i=0; i<dims[dim]; ++i)
+  
+  template<class T, class Idx1, class Idx2, class Idx3, int dim>
+  inline void gridded_data_ccons(T* dst, const T* src, 
+                                 const Idx1* dims, 
+                                 const Idx2 *dst_strides, 
+                                 const Idx3 *src_strides, 
+                                 boost::mpl::int_<dim>)
   {
-    gridded_data_ccons(dst, src, dims, dst_strides, src_strides, boost::mpl::int_<dim-1>());
-    dst += dst_strides[dim];
-    src += src_strides[dim];
+    for (int i=0; i<dims[dim]; ++i)
+    {
+      gridded_data_ccons(dst, src, dims, dst_strides, src_strides, boost::mpl::int_<dim-1>());
+      dst += dst_strides[dim];
+      src += src_strides[dim];
+    }
   }
-}
 
 }
 
@@ -246,9 +284,11 @@ template<class T, int rank>
 static array copy(const int* dims, const T* src, const int *strides)
 {
   int item_type = getItemtype<T>();
-  arrayt<T> arr(empty(rank, dims, item_type));
+  typename arrayt<T>::index_t arr_dims[MAX_DIM];
+  for (int i=0; i<rank; ++i) arr_dims[i] = dims[i];
+  arrayt<T> arr(empty(rank, arr_dims, item_type));
 
-  int arr_strides[MAX_DIM];
+  typename arrayt<T>::index_t arr_strides[MAX_DIM];
   for (int i=0; i<rank; ++i) arr_strides[i] = arr.strides()[i]/arr.itemsize();
   
   T* dst = arr.data();
@@ -262,7 +302,7 @@ static void copy(T* dst, const int *dims, const int* strides, const array &pyarr
 {
   arrayt<T> arr(pyarr);
 
-  int arr_strides[MAX_DIM];
+  typename arrayt<T>::index_t arr_strides[MAX_DIM];
   for (int i=0; i<rank; ++i) {
     assert(arr.shape()[i] == dims[i]);
     arr_strides[i] = arr.strides()[i]/arr.itemsize();

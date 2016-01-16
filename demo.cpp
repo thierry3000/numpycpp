@@ -77,9 +77,8 @@ void handleType(np::arraytbase arr, bool printContents)
   }    
 }
 
-void printArray(np::array pyarr, bool printContents)
+void printArrayInfo(const np::arraytbase &arr)
 {
-  np::arraytbase arr(pyarr);
   int i;
   cout << "rank()          = " << arr.rank() << endl;
   cout << "itemtype()      = " << arr.itemtype() << endl;
@@ -95,6 +94,13 @@ void printArray(np::array pyarr, bool printContents)
   for (i=0; i<arr.rank()-1; ++i)
     cout << arr.strides()[i] << ',';
   cout << arr.strides()[i] << endl;
+}
+
+
+void printArray(np::array pyarr, bool printContents)
+{
+  np::arraytbase arr(pyarr);
+  printArrayInfo(arr);
   
   handleType<PyObject*>(arr, printContents);
   handleType<float>(arr, printContents);
@@ -115,10 +121,28 @@ void printArray(np::array pyarr, bool printContents)
 }
 
 
+template<class T>
+void printConvertedArray(np::arrayt<T> arr)
+{
+  printArrayInfo(arr);
+  handleType<T>(arr, true);
+}
+
+template<class T>
+void print_stdout(const T &x)
+{
+  cout << x;
+}
+
+
 BOOST_PYTHON_MODULE(libdemo)
 {
   np::importNumpyAndRegisterTypes();
   py::def("printArray", printArray);
+  py::def("printConvertedArray_int", printConvertedArray<int>);
+  py::def("print_int", print_stdout<int>);
+  py::def("print_float", print_stdout<float>);
+  py::def("print_double", print_stdout<double>);
 }
 
 

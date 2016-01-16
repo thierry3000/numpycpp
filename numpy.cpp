@@ -3,33 +3,44 @@
 #include "numpy/ndarrayobject.h"
 #include "assert.h"
 #include <stdexcept>
+#include <cstring>
 
 namespace py = boost::python;
+namespace np = boost::python::numeric;
 
 namespace boost { namespace python { namespace numeric {
 
 namespace mw_py_impl
 {
 
+#if __cplusplus > 200000L
+static_assert(np::MAX_DIM == NPY_MAXDIMS, "MAX_DIMS should be equal to NPY_MAXDIMS");
+#endif
+
 /* sometimes scalar numpy arrays end up as arguments to c++ function calls. 
  * For these cases we need automatic conversion functions such as these.
  * However only conversion to int, float and double is current implemented. 
  */
-struct int_from_numpyint32
+template<class T>
+struct from_numpy_int
 {
     static void Register()
     {
       boost::python::converter::registry::push_back(
         &convertible,
         &construct,
-        boost::python::type_id<int>());
+        boost::python::type_id<T>());
     }
 
     static void* convertible(PyObject* obj_ptr)
     {
       if (PyArray_IsScalar(obj_ptr, Int32) ||
+          PyArray_IsScalar(obj_ptr, UInt32) ||
           PyArray_IsScalar(obj_ptr, Int64) ||
+          PyArray_IsScalar(obj_ptr, UInt64) ||
+          PyArray_IsScalar(obj_ptr, ULongLong) ||
           PyArray_IsScalar(obj_ptr, Int16) ||
+          PyArray_IsScalar(obj_ptr, UInt16) ||
           PyArray_IsScalar(obj_ptr, Int8) ||
           PyArray_IsScalar(obj_ptr, UInt8))
         return obj_ptr;
@@ -41,43 +52,55 @@ struct int_from_numpyint32
       PyObject* obj_ptr,
       boost::python::converter::rvalue_from_python_stage1_data* data)
     {
-      void* storage = ((boost::python::converter::rvalue_from_python_storage<int>*)data)->storage.bytes;
+      void* storage = ((boost::python::converter::rvalue_from_python_storage<T>*)data)->storage.bytes;
       data->convertible = storage;
       
       union
       {
-        int int_data;
-        short short_data;
-        long long longlong_data;
-        char char_data;
-        unsigned char uchar_data;
-        unsigned char buffer[128];
+        T data;
+        unsigned char buffer[128]; // gratuitously sized buffer, for CastScalarToCtype may fill in more bytes than sizeof(T)
       } buffer;
+      buffer.data = 0;
       
       if (PyArray_IsScalar(obj_ptr, Int8))
       {
         PyArray_CastScalarToCtype(obj_ptr, buffer.buffer, PyArray_DescrFromType(NPY_INT8));
-        new (storage) int(buffer.char_data);
+        new (storage) T(buffer.data);
       }
       else if (PyArray_IsScalar(obj_ptr, UInt8))
       {
         PyArray_CastScalarToCtype(obj_ptr, buffer.buffer, PyArray_DescrFromType(NPY_UINT8));
-        new (storage) int(buffer.uchar_data);
+        new (storage) T(buffer.data);
+      }
+      else if (PyArray_IsScalar(obj_ptr, Int16))
+      {
+        PyArray_CastScalarToCtype(obj_ptr, buffer.buffer, PyArray_DescrFromType(NPY_INT16));
+        new (storage) T(buffer.data);
       }
       else if (PyArray_IsScalar(obj_ptr, UInt16))
       {
-        PyArray_CastScalarToCtype(obj_ptr, buffer.buffer, PyArray_DescrFromType(NPY_INT16));
-        new (storage) int(buffer.short_data);
+        PyArray_CastScalarToCtype(obj_ptr, buffer.buffer, PyArray_DescrFromType(NPY_UINT16));
+        new (storage) T(buffer.data);
       }
       else if (PyArray_IsScalar(obj_ptr, Int32))
       {
         PyArray_CastScalarToCtype(obj_ptr, buffer.buffer, PyArray_DescrFromType(NPY_INT32));
-        new (storage) int(buffer.int_data);
+        new (storage) T(buffer.data);
+      }
+      else if (PyArray_IsScalar(obj_ptr, UInt32))
+      {
+        PyArray_CastScalarToCtype(obj_ptr, buffer.buffer, PyArray_DescrFromType(NPY_UINT32));
+        new (storage) T(buffer.data);
       }
       else if (PyArray_IsScalar(obj_ptr, Int64))
       {
         PyArray_CastScalarToCtype(obj_ptr, buffer.buffer, PyArray_DescrFromType(NPY_INT64));
-        new (storage) int(buffer.longlong_data);
+        new (storage) T(buffer.data);
+      }
+      else if (PyArray_IsScalar(obj_ptr, UInt64) ||  PyArray_IsScalar(obj_ptr, ULongLong))
+      {
+        PyArray_CastScalarToCtype(obj_ptr, buffer.buffer, PyArray_DescrFromType(NPY_UINT64));
+        new (storage) T(buffer.data);
       }
       else
         throw std::invalid_argument("numpy int type conversion error");
@@ -110,25 +133,88 @@ struct from_numpyfloat
 
       union
       {
-        float float_data;
-        double double_data;
+        float dataFloat;
+        double dataDouble;
         unsigned char buffer[128];
       } buffer;
+      memset(buffer.buffer, 0, 128);
       
       if (PyArray_IsScalar(obj_ptr, Float32))
       {
         PyArray_CastScalarToCtype(obj_ptr, buffer.buffer, PyArray_DescrFromType(NPY_FLOAT32));
-        new (storage) T(buffer.float_data);
+        new (storage) T(buffer.dataFloat);
       }
       else if (PyArray_IsScalar(obj_ptr, Float64))
       {
         PyArray_CastScalarToCtype(obj_ptr, buffer.buffer, PyArray_DescrFromType(NPY_FLOAT64));
-        new (storage) T(buffer.double_data);
+        new (storage) T(buffer.dataDouble);
       }
       else
         throw std::invalid_argument("numpy int type conversion error");
     }
 };
+
+
+template<class T>
+struct to_numpyarrayt
+{
+  typedef np::arrayt<T> ArrayType;
+  
+  static void Register()
+  {
+    boost::python::converter::registry::push_back(
+      &convertible,
+      &construct,
+      boost::python::type_id<ArrayType>());
+  }
+  
+  static void* convertible(PyObject* obj_ptr)
+  {
+    bool ok = PyArray_Check(obj_ptr);
+    ok &= np::isCompatibleType<T>(PyArray_TYPE((PyArrayObject*)obj_ptr));
+    return ok ? obj_ptr : 0;
+  }
+  
+  static void construct(
+    PyObject* obj_ptr,
+    boost::python::converter::rvalue_from_python_stage1_data* data)
+  {
+    void* storage = ((boost::python::converter::rvalue_from_python_storage<ArrayType>*)data)->storage.bytes;
+    data->convertible = storage;
+    
+    new (storage) arrayt<T>(py::object(py::borrowed(obj_ptr)));
+  }
+};
+
+
+struct to_toarraytbase
+{
+  typedef np::arraytbase ArrayType;
+  
+  static void Register()
+  {
+    boost::python::converter::registry::push_back(
+      &convertible,
+      &construct,
+      boost::python::type_id<ArrayType>());
+  }
+  
+  static void* convertible(PyObject* obj_ptr)
+  {
+    bool ok = PyArray_Check(obj_ptr);
+    return ok ? obj_ptr : 0;
+  }
+  
+  static void construct(
+    PyObject* obj_ptr,
+    boost::python::converter::rvalue_from_python_stage1_data* data)
+  {
+    void* storage = ((boost::python::converter::rvalue_from_python_storage<ArrayType>*)data)->storage.bytes;
+    data->convertible = storage;
+    new (storage) arraytbase(py::object(py::borrowed(obj_ptr)));
+  }
+};
+
 
 PyArrayObject* getPyArrayObjectPtr(py::object &o)
 {
@@ -151,27 +237,57 @@ void importNumpyAndRegisterTypes()
   import_array1(); // this is from the numpy c-API and import the numpy module into python
   
   // these are boost python type conversions
-  mw_py_impl::int_from_numpyint32::Register();
+  mw_py_impl::from_numpy_int<bool>::Register();
+  mw_py_impl::from_numpy_int<char>::Register();
+  mw_py_impl::from_numpy_int<short>::Register();
+  mw_py_impl::from_numpy_int<int>::Register();
+  mw_py_impl::from_numpy_int<long>::Register();
+  mw_py_impl::from_numpy_int<long long>::Register();
+
+  mw_py_impl::from_numpy_int<unsigned char>::Register();
+  mw_py_impl::from_numpy_int<unsigned short>::Register();
+  mw_py_impl::from_numpy_int<unsigned int>::Register();
+  mw_py_impl::from_numpy_int<unsigned long>::Register();
+  mw_py_impl::from_numpy_int<unsigned long long>::Register();
+  
   mw_py_impl::from_numpyfloat<float>::Register();
   mw_py_impl::from_numpyfloat<double>::Register();
+  
+  mw_py_impl::to_toarraytbase::Register();
+  mw_py_impl::to_numpyarrayt<bool>::Register();
+  mw_py_impl::to_numpyarrayt<char>::Register();
+  mw_py_impl::to_numpyarrayt<short>::Register();
+  mw_py_impl::to_numpyarrayt<int>::Register();
+  mw_py_impl::to_numpyarrayt<long>::Register();
+  mw_py_impl::to_numpyarrayt<long long>::Register();
+  mw_py_impl::to_numpyarrayt<float>::Register();
+  mw_py_impl::to_numpyarrayt<double>::Register();
+
+  mw_py_impl::to_numpyarrayt<unsigned char>::Register();
+  mw_py_impl::to_numpyarrayt<unsigned short>::Register();
+  mw_py_impl::to_numpyarrayt<unsigned int>::Register();
+  mw_py_impl::to_numpyarrayt<unsigned long>::Register();
+  mw_py_impl::to_numpyarrayt<unsigned long long>::Register();
   
   py::numeric::array::set_module_and_type("numpy", "ndarray"); // use numpy
 }
 
 
-array zeros(int rank, const int *dims, int type)
+array zeros(int rank, const Py_ssize_t *dims, int type)
 {
-  npy_intp tmp[NPY_MAXDIMS];
-  for(int i=0; i<rank; ++i) tmp[i] = dims[i];
+  //npy_intp tmp[NPY_MAXDIMS];
+  //for(int i=0; i<rank; ++i) tmp[i] = dims[i];
+  npy_intp* tmp = const_cast<npy_intp*>(dims);
   PyObject* p = PyArray_ZEROS(rank,tmp,type,true);
   return array(handle<>(p));
 }
 
 
-array empty(int rank, const int *dims, int type )
+array empty(int rank, const Py_ssize_t *dims, int type )
 {
-  npy_intp tmp[NPY_MAXDIMS];
-  for(int i=0; i<rank; ++i) tmp[i] = dims[i];
+  //npy_intp tmp[NPY_MAXDIMS];
+  //for(int i=0; i<rank; ++i) tmp[i] = dims[i];
+  npy_intp* tmp = const_cast<npy_intp*>(dims);
   PyObject* p = PyArray_EMPTY(rank, tmp, type, true);
   return array(handle<>(p));
 }
@@ -186,69 +302,107 @@ int getItemtype(const array &a)
 }
 
 
-arraytbase::arraytbase() :
-  obj(object())
-{
-
-}
-
 arraytbase::arraytbase(const object& a_) :
   obj(object()),
-  bytes_(NULL),
-  r(0)
+  objptr(NULL)
 {
-  memset(m,0,sizeof(int)*MAX_DIM);
-  memset(s,0,sizeof(int)*MAX_DIM);
+  construct(a_, -1);
+}
 
-  if (a_.is_none()) return;
+arraytbase::arraytbase(const object& a_, int typesize) :
+  obj(object()),
+  objptr(NULL)
+{
+  construct(a_, typesize);
+}
 
-  array a = obj = extract<array>(a_);
-  PyArrayObject* p = getPyArrayObjectPtr(a);
+
+void arraytbase::construct(object const &a_, int typesize)
+{
+  //memset(m,0,sizeof(int)*MAX_DIM);
+  //memset(s,0,sizeof(int)*MAX_DIM);
   
-  bool is_behaved = PyArray_ISBEHAVED(p);
+  if (a_.is_none()) return;
+  
+  array a = obj = extract<array>(a_);
+  objptr = getPyArrayObjectPtr(a);
+  
+  bool is_behaved = PyArray_ISBEHAVED(objptr);
   if (!is_behaved)
     throw std::invalid_argument("arrayt: numpy array is not behaved");
+
+  //r = PyArray_NDIM(objptr);
+  //assert(r < MAX_DIM);
+  //itemtype_ = PyArray_TYPE(objptr);
+  //itemsize_ = PyArray_ITEMSIZE(objptr);
+  if (typesize>0 && typesize != itemsize())
+    throw std::invalid_argument("arrayt: array itemsize does not match template argument");
   
-  // directly from the python object
-  //int t = getItemtype(a);
-  r = PyArray_NDIM(p);
-  assert(r < MAX_DIM);
-  itemtype_ = PyArray_TYPE(p);
-  itemsize_ = PyArray_ITEMSIZE(p);
-  bytes_ = (unsigned char*)PyArray_BYTES(p);
+  //bytes_ = (unsigned char*)PyArray_BYTES(objptr);
   // copy stuff
-  Py_ssize_t* p_strides = PyArray_STRIDES(p);
-  Py_ssize_t* p_dims = PyArray_DIMS(p);
-  int i=0;
-  for(; i<r; ++i)
-  {
-    m[i] = p_strides[i];
-    s[i] = p_dims[i];
-  }
-  for(; i<MAX_DIM; ++i)
-    s[i] = 1;
+//   Py_ssize_t* p_strides = PyArray_STRIDES(objptr);
+//   Py_ssize_t* p_dims = PyArray_DIMS(objptr);
+//   int i=0;
+//   for(; i<r; ++i)
+//   {
+//     m[i] = p_strides[i];
+//     s[i] = p_dims[i];
+//   }
+//   for(; i<MAX_DIM; ++i)
+//     s[i] = 1;    
+}
+
+
+int arraytbase::itemtype() const
+{
+  return PyArray_TYPE(objptr);
+}
+
+int arraytbase::itemsize() const
+{
+  return PyArray_ITEMSIZE(objptr);
+}
+
+int arraytbase::rank() const
+{
+  return PyArray_NDIM(objptr);
+}
+
+const Py_ssize_t* arraytbase::shape() const
+{
+  return PyArray_DIMS(objptr);
+}
+
+
+const Py_ssize_t* arraytbase::strides() const
+{
+  return PyArray_STRIDES(objptr);
 }
 
 
 bool arraytbase::isCContiguous() const
 {
-  const PyArrayObject* p = getPyArrayObjectPtr(obj);
-  return PyArray_IS_C_CONTIGUOUS(p);
+  return PyArray_IS_C_CONTIGUOUS(objptr);
 }
 
 
 bool arraytbase::isWriteable() const
 {
-  const PyArrayObject* p = getPyArrayObjectPtr(obj);
-  return PyArray_ISWRITEABLE(p);
+  return PyArray_ISWRITEABLE(objptr);
 }
 
 
 bool arraytbase::isFContiguous() const
 {
-  const PyArrayObject* p = getPyArrayObjectPtr(obj);
-  return PyArray_IS_F_CONTIGUOUS(p);
+  return PyArray_IS_F_CONTIGUOUS(objptr);
 }
+
+
+char* arraytbase::bytes()
+{
+  return PyArray_BYTES(objptr);
+}
+
 
 template<class T>
 bool isCompatibleType(int id)
