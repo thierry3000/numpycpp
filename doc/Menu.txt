@@ -55,5 +55,8 @@ File: numpy.hpp  (no auto-title, numpy.hpp)
 Group: Index  {
 
    Index: Everything
+   Constant Index: Constants
+   Function Index: Functions
+   Type Index: Types
    }  # Group: Index
 

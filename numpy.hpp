@@ -13,25 +13,71 @@ typedef tagPyArrayObject PyArrayObject;
 /*
 Namespace: boost::python::numeric
 
-The namespace where the classes of this library are found.
+Everything of this library can be found in this namespace where also boost's array class is defined.
 */
 namespace boost { namespace python { namespace numeric {
+  
+/*
+Namespace: mw_py_impl
 
+Some implementation details are in here.
+*/
 namespace mw_py_impl
 {
   // see here http://stackoverflow.com/questions/16454987/c-generate-a-compile-error-if-user-tries-to-instantiate-a-class-template-wiho
   template<class T>
   class incomplete;
-}
+};
 
-  
+/*
+Namespace: boost::python::numeric
+*/
+
+
+/*
+Constant: MAX_DIM 
+
+Equal to NPY_MAX_DIMS. Provided so that the numpy headers don't have to be included.
+*/
+enum {
+  MAX_DIM = 32
+};
+
+
+/*
+Typedef: ssize_t
+
+Synonymous for Py_ssize_t
+*/
+typedef Py_ssize_t ssize_t;
+
+
+/*
+Function: importNumpyAndRegisterTypes
+
+Does what the name implies. It calls
+> import_array1();
+> py::numeric::array::set_module_and_type("numpy", "ndarray");
+And it registers several converter routines in boost python 
+for automatic conversion of <arrayt>, <arraytbase> and scalar types.
+*/
 void importNumpyAndRegisterTypes();
 
 
-// see here http://stackoverflow.com/questions/16454987/c-generate-a-compile-error-if-user-tries-to-instantiate-a-class-template-wiho
+/*
+Function: getItemtype
+
+Obtain data type number from template parameter T.
+
+Returns:
+  By default, basic types are mapped to NPY_FLOAT32, NPY_FLOAT64, NPY_INT,
+  NPY_LONG, NPY_LONGLONG, NPY_SHORT, NPY_BYTE, NPY_BOOL, NPY_UINT, NPY_ULONG,
+  NPY_USHORT, NPY_UBYTE, NPY_ULONGLONG. PyObject* is mapped to NPY_OBJECT.
+*/
 template<class T>
 int getItemtype()
 {
+// see here http://stackoverflow.com/questions/16454987/c-generate-a-compile-error-if-user-tries-to-instantiate-a-class-template-wiho
   enum { S = sizeof(mw_py_impl::incomplete<T>) }; // will generate an error for types for which getItemtype was not implemented!
   return -1;
 }
@@ -55,24 +101,44 @@ NUMPY_HPP_FWD_DECLARE_GET_ITEMTYPE(unsigned char)
 NUMPY_HPP_FWD_DECLARE_GET_ITEMTYPE(unsigned long long)
 #undef NUMPY_HPP_FWD_DECLARE_GET_ITEMTYPE
 
-typedef Py_ssize_t ssize_t;
 
+/* 
+Function: zeros
+Creates an array filled with zeros.
+
+type - The numpy data type number. You can use <getItemtype> to obtain one.
+*/
 array zeros(int rank, const Py_ssize_t *dims, int type);
+
+/* 
+Function: empty
+Creates a boost::python::numeric::array with uninitialized memory.
+
+type - The numpy data type number. You can use <getItemtype> to obtain one.
+*/
 array empty(int rank, const Py_ssize_t *dims, int type);
 
+/*
+Function: getItemtype
+
+Obtain data type number from an instance of boost::python::numeric::array.
+*/
 int getItemtype(const array &arr);
 
-enum {
-  MAX_DIM = 32
-};
+/* 
+Function: isCompatibleType
 
+Determines if a numpy data type identified by the type number id is binary compatible with the c-type given by T. This function is specialized for basic number types: various sizes of integers, and float and double.
+
+Note: this is a many to one correspondence. For instance depending on the platform, numpy types 'int' and 'long' which have different type numbers are both 8 bytes in length and therefore both correspond to the long type in c++!
+*/
 template<class T>
 bool isCompatibleType(int id);
 
 /*
 Class: arraytbase
 
-This is a naturaldocs documentation test
+This is the base class from which type specific variants are derived.
 
 See Also:
   <arrayt>
@@ -82,7 +148,7 @@ class arraytbase
 protected:
   array obj; // the object
   PyArrayObject* objptr;
-  
+ 
   arraytbase(object const &a, int typesize);
   void construct(object const &a, int typesize);
 
@@ -90,7 +156,7 @@ public:
   arraytbase(object const &a = object());
   typedef Py_ssize_t index_t;
   
-  const Py_ssize_t* shape() const; // in number of bytes, *not* number of items!
+  const Py_ssize_t* shape() const;
   const Py_ssize_t* dims() const { return shape(); }
   const Py_ssize_t* strides() const; // in number of bytes, *not* number of items!
   int itemtype() const;
@@ -167,7 +233,12 @@ public:
   const char* bytes() const { return const_cast<arraytbase*>(this)->bytes(); }
 };
 
+/*
+Class: arrayt
 
+This class defines operators () and [] to allow for direct memory access to 
+array elements of type T.
+*/
 template<class T>
 class arrayt : public arraytbase
 {
@@ -255,7 +326,6 @@ public:
 
 namespace mw_py_impl
 {
-
   template<class T, class Idx1, class Idx2, class Idx3>
   inline void gridded_data_ccons(T* dst, const T* src, 
                                  const Idx1 *dims, 
@@ -285,7 +355,6 @@ namespace mw_py_impl
       src += src_strides[dim];
     }
   }
-
 }
 
 
