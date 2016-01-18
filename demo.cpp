@@ -7,7 +7,8 @@
 #include "numpy.hpp"
 
 namespace py = boost::python;
-namespace np = boost::python::numeric;
+namespace np = boost::python::numpy;
+namespace nm = boost::python::numeric;
 using namespace std;
 
 template<class T>
@@ -98,7 +99,7 @@ void printArrayInfo(const np::arraytbase &arr)
 }
 
 
-void printArray(np::array pyarr, bool printContents)
+void printArray(nm::array pyarr, bool printContents)
 {
   np::arraytbase arr(pyarr);
   printArrayInfo(arr);
@@ -146,6 +147,16 @@ std::string scalar_to_str(const char &x)
 }
 
 
+np::arraytbase ReturnedFromCPP()
+{
+  np::ssize_t dims = 5;
+  np::arrayt<float> ret(np::empty(1, &dims, np::getItemtype<float>()));
+  for (int i=0; i<dims; ++i)
+    ret[i] = i;
+  return ret;
+}
+
+
 py::object SumArrayT(np::arrayt<float> arr1, np::arrayt<float>  arr2)
 {
   np::arrayt<float> ret(np::empty(arr1.rank(), arr1.dims(), arr1.itemtype()));
@@ -158,10 +169,10 @@ py::object SumArrayT(np::arrayt<float> arr1, np::arrayt<float>  arr2)
   return ret.getObject();
 }
 
-py::object SumNumericArray(np::array arr1, np::array arr2)
+py::object SumNumericArray(nm::array arr1, nm::array arr2)
 {
   const np::ssize_t len = py::extract<int>(py::getattr(arr1, "shape")[0]);
-  np::array ret = np::empty(1, &len, np::getItemtype(arr1));
+  nm::array ret = py::extract<nm::array>(np::empty(1, &len, np::getItemtype(arr1)));
   for (int i=0; i<len; ++i)
   {
     float x1 = py::extract<float>(arr1[i]);
@@ -184,6 +195,7 @@ BOOST_PYTHON_MODULE(libdemo)
   py::def("double_to_str", scalar_to_str<double>);
   py::def("SumArrayT", SumArrayT);
   py::def("SumNumericArray", SumNumericArray);
+  py::def("ReturnedFromCPP", ReturnedFromCPP);
 }
 
 

@@ -4,8 +4,67 @@
 
 #include <boost/python.hpp>
 #include <boost/python/object.hpp>
-//#include <boost/mpl/int.hpp>
 #include "assert.h"
+
+/** @mainpage Numpy Cpp
+Introduction
+============
+
+This is a thin wrapper library around numpy. It depends on boost::python for reference counting and automatic type conversions.
+
+All members are defined in the namespace @ref boost::python::numpy.
+
+The class @ref boost::python::numpy::arrayt "arrayt<T>", templated by the element type, allow fast direct access to memory.
+
+The initialization routine @ref boost::python::numpy::importNumpyAndRegisterTypes "importNumpyAndRegisterTypes" registers converters for most basic scalar types. Moreover converters
+for the base class @ref boost::python::numpy::arraytbase "arraybase" as well as @ref boost::python::numpy::arrayt "arrayt" are registered. Therefore you can wrap, for instance,
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~{.cpp}
+    np::arraytbase SumArrayT(np::arrayt<float> arr1, np::arrayt<float>  arr2)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+directly by
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~{.cpp}
+    py::def("SumArrayT", SumArrayT);
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
+For the conversion back to python, there is only the converter for arraytbase. So you should return arraytbase regardless of the derived type used.  Examples can be found in demo.cpp and demo.py.
+
+### Tested on ###
+- gcc 4.8.4
+- boost 1.54
+- python 2.7
+- numpy 1.8.2
+
+Building
+========
+You probably just want to incorporate numpy.hpp and numpy.cpp into your project. Or build a library by yourself.
+It is possible to use (sym) links for that but beware that stupid editors like kdevelop might break the
+link by deleting the link and then rewriting a new copy of the file to disk ...
+
+Limitations
+===========
+The library wraps only parts that allow access to data. No manipulation routines such as resizing are currently implemented.
+
+Acknowledgements
+================
+Thanks to Austin Bingham for his comprehensive introduction to boost python converters https://misspent.wordpress.com/2009/09/27/how-to-write-boost-python-converters/
+
+*/
+
+
+/** @file numpy.hpp
+ *  @brief Things are in here.
+*/
+
+/** @file numpy.cpp
+ *  @brief Implementation in here.
+*/
+
+/** @file demo.cpp
+ *  @brief Demo in form of a python module in here. Also used for sanity testing.
+*/
+
+/** @file demo.py
+ *  @brief Uses the demo module.
+*/
 
 struct tagPyArrayObject;
 typedef tagPyArrayObject PyArrayObject;
@@ -13,9 +72,15 @@ typedef tagPyArrayObject PyArrayObject;
 namespace boost { namespace python { 
   
 /** 
- * @brief Everything of this library can be found in this namespace where also boost's array class is defined.
+ * @brief Everything of this library can be found in this namespace.
+ * 
+ * Hint: you can use something like 
+ *   > namespace py = boost::python;
+ * 
+ *   > namespace np = boost::python::numpy;
+ * for convenience.
 */
-namespace numeric {
+namespace numpy {
   
 /**
 @brief Some implementation details are in here.
@@ -58,7 +123,7 @@ By default, basic types are mapped to NPY_FLOAT32, NPY_FLOAT64, NPY_INT,
 NPY_LONG, NPY_LONGLONG, NPY_SHORT, NPY_BYTE, NPY_BOOL, NPY_UINT, NPY_ULONG,
 NPY_USHORT, NPY_UBYTE, NPY_ULONGLONG. PyObject* is mapped to NPY_OBJECT.
 
-@sa getItemtype(const array &arr);
+@sa getItemtype(const object &arr);
 */
 template<class T>
 int getItemtype()
@@ -67,6 +132,15 @@ int getItemtype()
   enum { S = sizeof(mw_py_impl::incomplete<T>) }; // will generate an error for types for which getItemtype was not implemented!
   return -1;
 }
+
+/**
+@brief Obtain numpy's data type number from an boost-python object which should hold a ndarray. 
+
+Returns the result of PyArray_TYPE() if arr is derived from ndarray, and -1 otherwise.
+
+@sa getItemtype<T>()
+*/
+int getItemtype(const object &arr);
 
 
 /** @cond */
@@ -90,29 +164,20 @@ NUMPY_HPP_FWD_DECLARE_GET_ITEMTYPE(unsigned long long)
 #undef NUMPY_HPP_FWD_DECLARE_GET_ITEMTYPE
 /** @endcond */
 
-/** @brief Creates a boost::python::numeric::array filled with zeros.
+/** @brief Creates a new ndarray filled with zeros.
 
 The type parameter specifies the numpy data type number. 
 You can use getItemtype<T>() to obtain one.
 
 */
-py::object zeros(int rank, const Py_ssize_t *dims, int type);
+object zeros(int rank, const Py_ssize_t *dims, int type);
 
-/** @brief boost::python::numeric::array with uninitialized memory.
+/** @brief Create a new ndarray with uninitialized memory.
 
 The type parameter specifies the numpy data type number. 
 You can use getItemtype<T>() to obtain one.
 */
-py::object empty(int rank, const Py_ssize_t *dims, int type);
-
-/**
-@brief Obtain numpy's data type number from an boost-python object which has to hold a ndarry. 
-
-Returns the result of PyArray_TYPE().
-
-@sa getItemtype<T>()
-*/
-int getItemtype(const py::object &arr);
+object empty(int rank, const Py_ssize_t *dims, int type);
 
 /**
 @brief Determines if a numpy data type identified by the type number id is binary compatible with the c-type given by T.
@@ -135,12 +200,15 @@ by _extract<arraytbase>(obj)_ or by automatic conversion by boost::pythons funct
 
 Members provided access to basic information that don't require casting to a specific element type.
 
+arraytbase is *not* derived from boost::python::object because i don't want its members (operator() in particular)
+to get in the way of my own definitions.
+
 \sa arrayt
 */
 class arraytbase
 { 
 protected:
-  array obj; // the object
+  object obj; // for reference counting
   PyArrayObject* objptr;
  
   arraytbase(object const &a, int typesize);
@@ -162,7 +230,7 @@ public:
   bool isWriteable() const;
   bool isCContiguous() const;
   bool isFContiguous() const;
-  const array& getObject() const { return obj; }
+  const object& getObject() const { return obj; }
 
 #define NUMPY_HPP_OFFSET1 \
   x*m[0]
@@ -174,8 +242,8 @@ public:
   NUMPY_HPP_OFFSET3 + w*m[3]
   
   /// Returned in number of bytes.
-  /** Returns the position from the given integer coordinates of an element 
-   *  in the memory block pointed to by _bytes()_.
+  /** Returns the position within memory corresponding to the given integer coordinates. No range checking is 
+   *  performed in release builds. However access is protected by use of the assert macro.
    * @sa ssize_t offset(int x, int y) const
    * @sa ssize_t offset(int x, int y, int z)  const
    * @sa ssize_t offset(int x,int y, int z, int w)  const
@@ -274,6 +342,10 @@ public:
     new (this) arrayt<T>(a_);
   }
 
+  /** Various accessors exist which use offset() internally.
+   * 
+   * @sa arraytbase::offset
+   * */
   T& operator()(int x)
   {
     return *((T*)(arraytbase::bytes()+offset(x)));
@@ -378,10 +450,13 @@ namespace mw_py_impl
 /**
  * @brief Copy contents of n-dimensional non-contiguous arrays.
  * 
- * Strides given in *number of items*, *not in bytes*
+ * @param [in] dims - Number of items to copy along each dimension
+ * @param [in] src  - Pointer to the source memory
+ * @param [in] strides - How far to move in (source) memory if the corresponding index is increased by one. Strides are given in *number of items*, *not in bytes*.
+ * @return ndarray wrapped in an instance of boost::python::object.
  */
 template<class T, int rank>
-static array copy(const int* dims, const T* src, const int *strides)
+static object copy(const int* dims, const T* src, const int *strides)
 {
   int item_type = getItemtype<T>();
   typename arrayt<T>::ssize_t arr_dims[MAX_DIM];
@@ -397,8 +472,16 @@ static array copy(const int* dims, const T* src, const int *strides)
   return arr.getObject();
 }
 
+/**
+ * @brief Copy contents of n-dimensional non-contiguous arrays. Inverse variant.
+ * 
+ * @param [out] dst - Pointer to destination memory.
+ * @param [in] dims - Number of items to copy along each dimension
+ * @param [in] strides - How far to move in (destination) memory if the corresponding index is increased by one. Strides are given in *number of items*, *not in bytes*.
+ * @param [in] pyarr - Must contain an instance of ndarray.
+*/
 template<class T, int rank>
-static void copy(T* dst, const int *dims, const int* strides, const array &pyarr)
+static void copy(T* dst, const int *dims, const int* strides, const object &pyarr)
 {
   arrayt<T> arr(pyarr);
 

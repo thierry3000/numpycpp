@@ -6,13 +6,13 @@
 #include <cstring>
 
 namespace py = boost::python;
-namespace np = boost::python::numeric;
 
-namespace boost { namespace python { namespace numeric {
+namespace boost { namespace python { namespace numpy {
 
 namespace mw_py_impl
 {
-
+namespace np = boost::python::numpy;
+  
 #if __cplusplus > 200000L
 static_assert(np::MAX_DIM == NPY_MAXDIMS, "MAX_DIMS should be equal to NPY_MAXDIMS");
 #endif
@@ -130,6 +130,23 @@ struct to_toarraytbase
 };
 
 
+struct from_arraytbase
+{ 
+  typedef np::arraytbase TheType; 
+  
+  static PyObject* convert(const TheType& arr)
+  {
+    return py::incref(arr.getObject().ptr());
+  }
+  
+  static void Register()
+  {
+    py::to_python_converter<TheType, from_arraytbase>();
+  }
+};
+
+
+
 PyArrayObject* getPyArrayObjectPtr(py::object &o)
 {
   return reinterpret_cast<PyArrayObject*>(o.ptr());
@@ -168,6 +185,8 @@ void importNumpyAndRegisterTypes()
   mw_py_impl::from_numpy_scalar<double>::Register();
   
   mw_py_impl::to_toarraytbase::Register();
+  mw_py_impl::from_arraytbase::Register();
+  
   mw_py_impl::to_numpyarrayt<bool>::Register();
   mw_py_impl::to_numpyarrayt<char>::Register();
   mw_py_impl::to_numpyarrayt<short>::Register();
@@ -187,40 +206,45 @@ void importNumpyAndRegisterTypes()
 }
 
 
-array zeros(int rank, const Py_ssize_t *dims, int type)
+object zeros(int rank, const Py_ssize_t *dims, int type)
 {
   npy_intp* tmp = const_cast<npy_intp*>(dims);
   PyObject* p = PyArray_ZEROS(rank,tmp,type,true);
-  return array(handle<>(p));
+  return py::object(handle<>(p));
 }
 
 
-array empty(int rank, const Py_ssize_t *dims, int type )
+object empty(int rank, const Py_ssize_t *dims, int type )
 {
   npy_intp* tmp = const_cast<npy_intp*>(dims);
   PyObject* p = PyArray_EMPTY(rank, tmp, type, true);
-  return array(handle<>(p));
+  return py::object(handle<>(p));
 }
 
 
 
-int getItemtype(const array &a)
+int getItemtype(const object &a)
 { 
-  const PyArrayObject* p = getPyArrayObjectPtr(a);
-  int t = PyArray_TYPE(p);
-  return t;
+  if (PyArray_Check(a.ptr()))
+  {
+    const PyArrayObject* p = getPyArrayObjectPtr(a);
+    int t = PyArray_TYPE(p);
+    return t;
+  }
+  else
+    return -1;
 }
 
 
 arraytbase::arraytbase(const object& a_) :
-  obj(object()),
+obj(py::object()),
   objptr(NULL)
 {
   construct(a_, -1);
 }
 
 arraytbase::arraytbase(const object& a_, int typesize) :
-  obj(object()),
+obj(py::object()),
   objptr(NULL)
 {
   construct(a_, typesize);
@@ -229,8 +253,11 @@ arraytbase::arraytbase(const object& a_, int typesize) :
 
 void arraytbase::construct(object const &a_, int typesize)
 { 
-  obj = extract<array>(a_);
+  obj = a_;
   if (obj.is_none()) return;
+  
+  if (!PyArray_Check(obj.ptr()))
+    throw std::invalid_argument("arrayt: attempted construction with something that is not derived from ndarray");
   
   objptr = getPyArrayObjectPtr(obj);
   
@@ -300,6 +327,7 @@ bool isCompatibleType(int id)
   return false;
 }
 
+/** @cond */
 #define DEF_TYPE_COMPATIBILITY1(T, npyT1) \
   template<> bool isCompatibleType<T>(int id)  {  return id == npyT1; }
 #define DEF_TYPE_COMPATIBILITY2(T, npyT1, npyT2) \
@@ -350,6 +378,6 @@ DEF_ARRY_TYPE2ID(unsigned long,NPY_ULONG);
 DEF_ARRY_TYPE2ID(unsigned short,NPY_USHORT);
 DEF_ARRY_TYPE2ID(unsigned char,NPY_UBYTE);
 DEF_ARRY_TYPE2ID(unsigned long long ,NPY_ULONGLONG);
-
+/** @endcond */
 
 } } } // namespace

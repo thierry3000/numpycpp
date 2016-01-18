@@ -56,34 +56,38 @@ for dt in types:
   a = np.asarray((42,), dtype = dt)[0]
   print ('%s: as int: %s, as char: %s, as float: %s, as double: %s' % (str(dt), int_to_str(a), char_to_str(a), float_to_str(a), double_to_str(a)))
 
-
-print ('PERFORMANCE TEST:')
-import time
-import matplotlib.pyplot as pyplot
-
-def PerfTest(fun):
-  print ('TEST: '+str(fun.__name__))
-  sizes = [1000, 10000, 100000, 1000000]
-  times = []
-  for s in sizes:
-    a1 = np.arange(s, dtype = np.float32)
-    a2 = np.ones(s, dtype = np.float32)
-    tavg = []
-    for n in xrange(10):
-      t0 = time.clock()
-      result = fun(a1, a2)
-      t1 = time.clock()
-      tavg.append(t1 - t0)
-    times.append(np.average(tavg))
-  return sizes, np.asarray(times)
-
-sz, perfArrayT     = PerfTest(libdemo.SumArrayT)
-print perfArrayT
-
-sz, perfBoostArray = PerfTest(libdemo.SumNumericArray)
-print perfBoostArray
+print ('RETURNING ARRAY FROM CPP:')
+a = libdemo.ReturnedFromCPP()
+print a
 
 
-pyplot.plot(sz, perfBoostArray / perfArrayT)
-pyplot.gca().set(xlabel = 'Array Size', ylabel = 'Relative Compute Time')
-pyplot.show()
+if 0:
+  # direct memory access with arrayt<float> is approximately 38x faster than using numeric::array
+  print ('PERFORMANCE TEST:')
+  import time
+  import matplotlib.pyplot as pyplot
+  
+  def PerfTest(fun):
+    print ('TEST: '+str(fun.__name__))
+    sizes = [1000, 10000, 100000, 1000000]
+    times = []
+    for s in sizes:
+      a1 = np.arange(s, dtype = np.float32)
+      a2 = np.ones(s, dtype = np.float32)
+      tavg = []
+      for n in xrange(10):
+        t0 = time.clock()
+        result = fun(a1, a2)
+        t1 = time.clock()
+        tavg.append(t1 - t0)
+      times.append(np.average(tavg))
+    return sizes, np.asarray(times)
+  
+  sz, perfArrayT     = PerfTest(libdemo.SumArrayT)
+  print perfArrayT
+  sz, perfBoostArray = PerfTest(libdemo.SumNumericArray)
+  print perfBoostArray
+  
+  pyplot.plot(sz, perfBoostArray / perfArrayT)
+  pyplot.gca().set(xlabel = 'Array Size', ylabel = 'Relative Compute Time')
+  pyplot.show()
