@@ -10,17 +10,15 @@
 struct tagPyArrayObject;
 typedef tagPyArrayObject PyArrayObject;
 
-/*
-Namespace: boost::python::numeric
-
-Everything of this library can be found in this namespace where also boost's array class is defined.
-*/
-namespace boost { namespace python { namespace numeric {
+namespace boost { namespace python { 
   
-/*
-Namespace: mw_py_impl
-
-Some implementation details are in here.
+/** 
+ * @brief Everything of this library can be found in this namespace where also boost's array class is defined.
+*/
+namespace numeric {
+  
+/**
+@brief Some implementation details are in here.
 */
 namespace mw_py_impl
 {
@@ -29,34 +27,24 @@ namespace mw_py_impl
   class incomplete;
 };
 
-/*
-Namespace: boost::python::numeric
-*/
 
-
-/*
-Constant: MAX_DIM 
-
-Equal to NPY_MAX_DIMS. Provided so that the numpy headers don't have to be included.
+/** @brief Equal to NPY_MAX_DIMS. Provided so that the numpy headers don't have to be included.
 */
 enum {
   MAX_DIM = 32
 };
 
 
-/*
-Typedef: ssize_t
-
-Synonymous for Py_ssize_t
+/** @brief Synonymous for Py_ssize_t
 */
 typedef Py_ssize_t ssize_t;
 
 
-/*
-Function: importNumpyAndRegisterTypes
+/** @brief Initializes things.
 
-Does what the name implies. It calls
+It calls
 > import_array1();
+
 > py::numeric::array::set_module_and_type("numpy", "ndarray");
 And it registers several converter routines in boost python 
 for automatic conversion of <arrayt>, <arraytbase> and scalar types.
@@ -64,15 +52,13 @@ for automatic conversion of <arrayt>, <arraytbase> and scalar types.
 void importNumpyAndRegisterTypes();
 
 
-/*
-Function: getItemtype
+/** @brief Obtain numpy's data type number from template parameter T.
 
-Obtain data type number from template parameter T.
+By default, basic types are mapped to NPY_FLOAT32, NPY_FLOAT64, NPY_INT,
+NPY_LONG, NPY_LONGLONG, NPY_SHORT, NPY_BYTE, NPY_BOOL, NPY_UINT, NPY_ULONG,
+NPY_USHORT, NPY_UBYTE, NPY_ULONGLONG. PyObject* is mapped to NPY_OBJECT.
 
-Returns:
-  By default, basic types are mapped to NPY_FLOAT32, NPY_FLOAT64, NPY_INT,
-  NPY_LONG, NPY_LONGLONG, NPY_SHORT, NPY_BYTE, NPY_BOOL, NPY_UINT, NPY_ULONG,
-  NPY_USHORT, NPY_UBYTE, NPY_ULONGLONG. PyObject* is mapped to NPY_OBJECT.
+@sa getItemtype(const array &arr);
 */
 template<class T>
 int getItemtype()
@@ -82,6 +68,8 @@ int getItemtype()
   return -1;
 }
 
+
+/** @cond */
 #define NUMPY_HPP_FWD_DECLARE_GET_ITEMTYPE(T)\
   template<> int getItemtype<T>();
   
@@ -100,48 +88,54 @@ NUMPY_HPP_FWD_DECLARE_GET_ITEMTYPE(unsigned short)
 NUMPY_HPP_FWD_DECLARE_GET_ITEMTYPE(unsigned char)
 NUMPY_HPP_FWD_DECLARE_GET_ITEMTYPE(unsigned long long)
 #undef NUMPY_HPP_FWD_DECLARE_GET_ITEMTYPE
+/** @endcond */
 
+/** @brief Creates a boost::python::numeric::array filled with zeros.
 
-/* 
-Function: zeros
-Creates an array filled with zeros.
+The type parameter specifies the numpy data type number. 
+You can use getItemtype<T>() to obtain one.
 
-type - The numpy data type number. You can use <getItemtype> to obtain one.
 */
-array zeros(int rank, const Py_ssize_t *dims, int type);
+py::object zeros(int rank, const Py_ssize_t *dims, int type);
 
-/* 
-Function: empty
-Creates a boost::python::numeric::array with uninitialized memory.
+/** @brief boost::python::numeric::array with uninitialized memory.
 
-type - The numpy data type number. You can use <getItemtype> to obtain one.
+The type parameter specifies the numpy data type number. 
+You can use getItemtype<T>() to obtain one.
 */
-array empty(int rank, const Py_ssize_t *dims, int type);
+py::object empty(int rank, const Py_ssize_t *dims, int type);
 
-/*
-Function: getItemtype
+/**
+@brief Obtain numpy's data type number from an boost-python object which has to hold a ndarry. 
 
-Obtain data type number from an instance of boost::python::numeric::array.
+Returns the result of PyArray_TYPE().
+
+@sa getItemtype<T>()
 */
-int getItemtype(const array &arr);
+int getItemtype(const py::object &arr);
 
-/* 
-Function: isCompatibleType
+/**
+@brief Determines if a numpy data type identified by the type number id is binary compatible with the c-type given by T.
 
-Determines if a numpy data type identified by the type number id is binary compatible with the c-type given by T. This function is specialized for basic number types: various sizes of integers, and float and double.
+This function is specialized for basic number types: various sizes of integers, and float and double.
+This is a many to one correspondence. For instance depending on the platform, numpy types 'int' and 'long' which have different type numbers are both 8 bytes in length and therefore both correspond to the long type in c++!
 
-Note: this is a many to one correspondence. For instance depending on the platform, numpy types 'int' and 'long' which have different type numbers are both 8 bytes in length and therefore both correspond to the long type in c++!
+@sa getItemtype<T>()
 */
 template<class T>
 bool isCompatibleType(int id);
 
-/*
-Class: arraytbase
+/**
+@brief This is the base class from which type specific variants are derived.
 
-This is the base class from which type specific variants are derived.
+It stores only the object pointer and an instance of boost::python::numeric::array 
+for reference counting. Therefore the referenced object can be changed during the lifetime
+of an arraytbase instance. An instance of this class can be extracted from a boost::python object _obj_
+by _extract<arraytbase>(obj)_ or by automatic conversion by boost::pythons function wrapping facilities.
 
-See Also:
-  <arrayt>
+Members provided access to basic information that don't require casting to a specific element type.
+
+\sa arrayt
 */
 class arraytbase
 { 
@@ -153,12 +147,14 @@ protected:
   void construct(object const &a, int typesize);
 
 public:
+  /* 
+   */
   arraytbase(object const &a = object());
-  typedef Py_ssize_t index_t;
+  typedef Py_ssize_t ssize_t;
   
-  const Py_ssize_t* shape() const;
-  const Py_ssize_t* dims() const { return shape(); }
-  const Py_ssize_t* strides() const; // in number of bytes, *not* number of items!
+  const ssize_t* shape() const;
+  const ssize_t* dims() const { return shape(); }
+  const ssize_t* strides() const; ///< Returned in number of bytes.
   int itemtype() const;
   int itemsize() const;
   int rank() const;
@@ -177,14 +173,22 @@ public:
 #define NUMPY_HPP_OFFSET4 \
   NUMPY_HPP_OFFSET3 + w*m[3]
   
-  inline Py_ssize_t offset(int x) const
+  /// Returned in number of bytes.
+  /** Returns the position from the given integer coordinates of an element 
+   *  in the memory block pointed to by _bytes()_.
+   * @sa ssize_t offset(int x, int y) const
+   * @sa ssize_t offset(int x, int y, int z)  const
+   * @sa ssize_t offset(int x,int y, int z, int w)  const
+   * @sa ssize_t offset(const int *c)  const
+   */
+  inline ssize_t offset(int x) const
   {
     const Py_ssize_t* m = strides();
     assert((unsigned int)x<shape()[0]);
     return NUMPY_HPP_OFFSET1;
   }
   
-  inline Py_ssize_t offset(int x, int y) const
+  inline ssize_t offset(int x, int y) const
   {
     const Py_ssize_t* m = strides();
     assert((Py_ssize_t)x<shape()[0]);
@@ -192,7 +196,7 @@ public:
     return NUMPY_HPP_OFFSET2;
   }
   
-  inline Py_ssize_t offset(int x, int y, int z) const
+  inline ssize_t offset(int x, int y, int z) const
   {
     const Py_ssize_t* m = strides();
     assert((Py_ssize_t)x<shape()[0]);
@@ -201,7 +205,7 @@ public:
     return NUMPY_HPP_OFFSET3;
   }
   
-  inline Py_ssize_t offset(int x,int y, int z, int w) const
+  inline ssize_t offset(int x,int y, int z, int w) const
   {
     const Py_ssize_t* m = strides();
     assert((Py_ssize_t)x<shape()[0]);
@@ -211,7 +215,7 @@ public:
     return NUMPY_HPP_OFFSET4;
   }
 
-  inline Py_ssize_t offset(const int *c) const
+  inline ssize_t offset(const int *c) const /// _c_ must point to an array of at least rank() items.
   {
     const Py_ssize_t* m = strides();
     int r = rank();
@@ -229,14 +233,13 @@ public:
 #undef NUMPY_HPP_OFFSET3
 #undef NUMPY_HPP_OFFSET4
   
+  /// Access to the array's memory block.
   char* bytes();
   const char* bytes() const { return const_cast<arraytbase*>(this)->bytes(); }
 };
 
-/*
-Class: arrayt
-
-This class defines operators () and [] to allow for direct memory access to 
+/**
+@brief This class defines operators () and [] to allow for direct memory access to 
 array elements of type T.
 */
 template<class T>
@@ -244,13 +247,27 @@ class arrayt : public arraytbase
 {
 public:
   arrayt() : arraytbase() {}
+  /**
+   * @brief Construct a new instance from the base class.
+   * 
+   * The constructors check if the referenced array is behaved (in numpy terms),
+   * which means that it must satisfy certain alignment and byte order criteria.
+   * (See numpy documentation). The constructor also checks if sizeof(T) is equal
+   * to the numpy data type of a. If the checks fail an exception of std::invalid_argument
+   * is raised.
+   * 
+   * \sa arrayt(object const &a)
+   */
   arrayt(arraytbase const &a) : arraytbase(a.getObject(), sizeof(T)) 
   {
   }
+  
+  /// Construct a new  instance from a boost::python object.
   arrayt(object const &a) : arraytbase(a, sizeof(T))
   {
   }
 
+  /// Take hold of another array. Same rules as for the constructors apply.
   void init(object const &a_)
   {
     this->~arrayt<T>();
@@ -358,18 +375,20 @@ namespace mw_py_impl
 }
 
 
-/*
- * WARNING: strides given in number of items, *not in bytes*
+/**
+ * @brief Copy contents of n-dimensional non-contiguous arrays.
+ * 
+ * Strides given in *number of items*, *not in bytes*
  */
 template<class T, int rank>
 static array copy(const int* dims, const T* src, const int *strides)
 {
   int item_type = getItemtype<T>();
-  typename arrayt<T>::index_t arr_dims[MAX_DIM];
+  typename arrayt<T>::ssize_t arr_dims[MAX_DIM];
   for (int i=0; i<rank; ++i) arr_dims[i] = dims[i];
   arrayt<T> arr(empty(rank, arr_dims, item_type));
 
-  typename arrayt<T>::index_t arr_strides[MAX_DIM];
+  typename arrayt<T>::ssize_t arr_strides[MAX_DIM];
   for (int i=0; i<rank; ++i) arr_strides[i] = arr.strides()[i]/arr.itemsize();
   
   T* dst = arr.data();
@@ -383,7 +402,7 @@ static void copy(T* dst, const int *dims, const int* strides, const array &pyarr
 {
   arrayt<T> arr(pyarr);
 
-  typename arrayt<T>::index_t arr_strides[MAX_DIM];
+  typename arrayt<T>::ssize_t arr_strides[MAX_DIM];
   for (int i=0; i<rank; ++i) {
     assert(arr.shape()[i] == dims[i]);
     arr_strides[i] = arr.strides()[i]/arr.itemsize();

@@ -228,11 +228,11 @@ arraytbase::arraytbase(const object& a_, int typesize) :
 
 
 void arraytbase::construct(object const &a_, int typesize)
-{
-  if (a_.is_none()) return;
+{ 
+  obj = extract<array>(a_);
+  if (obj.is_none()) return;
   
-  array a = obj = extract<array>(a_);
-  objptr = getPyArrayObjectPtr(a);
+  objptr = getPyArrayObjectPtr(obj);
   
   bool is_behaved = PyArray_ISBEHAVED(objptr);
   if (!is_behaved)

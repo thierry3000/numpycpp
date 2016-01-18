@@ -146,6 +146,33 @@ std::string scalar_to_str(const char &x)
 }
 
 
+py::object SumArrayT(np::arrayt<float> arr1, np::arrayt<float>  arr2)
+{
+  np::arrayt<float> ret(np::empty(arr1.rank(), arr1.dims(), arr1.itemtype()));
+  
+  const np::ssize_t *dims = arr1.dims();
+  for (int i=0; i<dims[0]; ++i)
+  {
+    ret(i) = arr1(i) + arr2(i);
+  }
+  return ret.getObject();
+}
+
+py::object SumNumericArray(np::array arr1, np::array arr2)
+{
+  const np::ssize_t len = py::extract<int>(py::getattr(arr1, "shape")[0]);
+  np::array ret = np::empty(1, &len, np::getItemtype(arr1));
+  for (int i=0; i<len; ++i)
+  {
+    float x1 = py::extract<float>(arr1[i]);
+    float x2 = py::extract<float>(arr2[i]);
+    ret[i] = py::object(x1 + x2);
+  }
+  return ret;
+}
+
+
+
 BOOST_PYTHON_MODULE(libdemo)
 {
   np::importNumpyAndRegisterTypes();
@@ -155,6 +182,8 @@ BOOST_PYTHON_MODULE(libdemo)
   py::def("int_to_str", scalar_to_str<int>);
   py::def("float_to_str", scalar_to_str<float>);
   py::def("double_to_str", scalar_to_str<double>);
+  py::def("SumArrayT", SumArrayT);
+  py::def("SumNumericArray", SumNumericArray);
 }
 
 
