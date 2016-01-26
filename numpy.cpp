@@ -88,7 +88,7 @@ PyArray_Descr* from_numpy_scalar<T>::descr = NULL;
 
 
 template<class T>
-struct to_numpyarrayt
+struct to_arrayt
 {
   typedef np::arrayt<T> ArrayType;
   
@@ -163,6 +163,30 @@ struct from_arraytbase
   }
 };
 
+template<class T>
+struct from_arrayt
+{
+  typedef np::arrayt<T> TheType;
+  
+  static PyObject* convert(const TheType& arr)
+  {
+    return py::incref(arr.getObject().ptr());
+  }
+  
+  static void Register()
+  {
+    py::to_python_converter<TheType, from_arrayt<T> >();
+  }
+};
+
+
+template<class T>
+void RegisterAllConvertersForType()
+{
+  from_numpy_scalar<T>::Register();
+  to_arrayt<T>::Register();
+  from_arrayt<T>::Register();
+}
 
 
 PyArrayObject* getPyArrayObjectPtr(py::object &o)
@@ -186,39 +210,24 @@ void importNumpyAndRegisterTypes()
   import_array1(); // this is from the numpy c-API and import the numpy module into python
   
   // these are boost python type conversions
-  mw_py_impl::from_numpy_scalar<bool>::Register();
-  mw_py_impl::from_numpy_scalar<char>::Register();
-  mw_py_impl::from_numpy_scalar<short>::Register();
-  mw_py_impl::from_numpy_scalar<int>::Register();
-  mw_py_impl::from_numpy_scalar<long>::Register();
-  mw_py_impl::from_numpy_scalar<long long>::Register();
+  mw_py_impl::RegisterAllConvertersForType<bool>();
+  mw_py_impl::RegisterAllConvertersForType<char>();
+  mw_py_impl::RegisterAllConvertersForType<short>();
+  mw_py_impl::RegisterAllConvertersForType<int>();
+  mw_py_impl::RegisterAllConvertersForType<long>();
+  mw_py_impl::RegisterAllConvertersForType<long long>();
 
-  mw_py_impl::from_numpy_scalar<unsigned char>::Register();
-  mw_py_impl::from_numpy_scalar<unsigned short>::Register();
-  mw_py_impl::from_numpy_scalar<unsigned int>::Register();
-  mw_py_impl::from_numpy_scalar<unsigned long>::Register();
-  mw_py_impl::from_numpy_scalar<unsigned long long>::Register();
+  mw_py_impl::RegisterAllConvertersForType<unsigned char>();
+  mw_py_impl::RegisterAllConvertersForType<unsigned short>();
+  mw_py_impl::RegisterAllConvertersForType<unsigned int>();
+  mw_py_impl::RegisterAllConvertersForType<unsigned long>();
+  mw_py_impl::RegisterAllConvertersForType<unsigned long long>();
   
-  mw_py_impl::from_numpy_scalar<float>::Register();
-  mw_py_impl::from_numpy_scalar<double>::Register();
+  mw_py_impl::RegisterAllConvertersForType<float>();
+  mw_py_impl::RegisterAllConvertersForType<double>();
   
   mw_py_impl::to_toarraytbase::Register();
   mw_py_impl::from_arraytbase::Register();
-  
-  mw_py_impl::to_numpyarrayt<bool>::Register();
-  mw_py_impl::to_numpyarrayt<char>::Register();
-  mw_py_impl::to_numpyarrayt<short>::Register();
-  mw_py_impl::to_numpyarrayt<int>::Register();
-  mw_py_impl::to_numpyarrayt<long>::Register();
-  mw_py_impl::to_numpyarrayt<long long>::Register();
-  mw_py_impl::to_numpyarrayt<float>::Register();
-  mw_py_impl::to_numpyarrayt<double>::Register();
-
-  mw_py_impl::to_numpyarrayt<unsigned char>::Register();
-  mw_py_impl::to_numpyarrayt<unsigned short>::Register();
-  mw_py_impl::to_numpyarrayt<unsigned int>::Register();
-  mw_py_impl::to_numpyarrayt<unsigned long>::Register();
-  mw_py_impl::to_numpyarrayt<unsigned long long>::Register();
   
   py::numeric::array::set_module_and_type("numpy", "ndarray"); // use numpy
 }
