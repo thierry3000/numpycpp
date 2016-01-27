@@ -34,17 +34,31 @@ All members are defined in the namespace @ref boost::python::numpy.
 
 The class @ref boost::python::numpy::arrayt "arrayt<T>", templated by the element type, allow fast direct access to memory.
 
-The initialization routine @ref boost::python::numpy::importNumpyAndRegisterTypes "importNumpyAndRegisterTypes" registers converters for most basic scalar types. Moreover converters
-for the base class @ref boost::python::numpy::arraytbase "arraybase" as well as @ref boost::python::numpy::arrayt "arrayt" are registered. Therefore you can wrap, for instance,
+The initialization routine @ref 
+boost::python::numpy::importNumpyAndRegisterTypes 
+"importNumpyAndRegisterTypes" registers converters for most basic 
+scalar types. Moreover converters for the base class @ref boost::python::numpy::arraytbase "arraybase" 
+as well as @ref boost::python::numpy::arrayt "arrayt" are registered. Therefore you 
+can wrap, for instance,
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~{.cpp}
-    np::arraytbase SumArrayT(np::arrayt<float> arr1, np::arrayt<float>  arr2)
+    np::arrayt<double> SumArrayT(np::arrayt<float> arr1, np::arrayt<float>  arr2)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 directly by
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~{.cpp}
     py::def("SumArrayT", SumArrayT);
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
-For the conversion back to python, there is only the converter for arraytbase. So you should return arraytbase regardless of the derived type used.  Examples can be found in demo.cpp and demo.py.
+Examples can be found in demo.cpp and demo.py. What does not work
+is automatic conversion to `boost::python::object`, since arraytbase is not
+derived from object. For instance
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~{.cpp}
+    py::object Test()
+    {
+      return arrayt<float>( ... );
+    }  // nope!
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+will give an error. Construct py::object() explicitly instead.
 
+    
 ### Tested on ###
 - gcc 4.8.4
 - boost 1.54
@@ -60,6 +74,18 @@ link by deleting the link and then rewriting a new copy of the file to disk ...
 Limitations
 ===========
 The library wraps only parts that allow access to data. No manipulation routines such as resizing are currently implemented.
+
+
+Changelog
+=========
+- 2016-01-14: Initial release.
+- 2016-01-27: Added converters from arrayt<T> to python for basic number types.
+
+Future Work
+===========
+I think it might be better to put everything into a single header to enable users to write their own specialized converters easily. It would make
+the library more easy to use since there would be no object file to compile. But it would come at the cost of inclusion of the numpy headers, thus
+polluting the global name space with the c-api of numpy ...
 
 Acknowledgements
 ================
