@@ -60,10 +60,8 @@ will give an error. Construct py::object() explicitly instead.
 
     
 ### Tested on ###
-- gcc 4.8.4
-- boost 1.54
-- python 2.7
-- numpy 1.8.2
+- gcc 4.8.4, boost 1.54, python 2.7, numpy 1.8.2
+- gcc 4.7.2, boost 1.49, python2.7, numpy 1.6.2
 
 Building
 ========
@@ -109,9 +107,7 @@ Thanks to Austin Bingham for his comprehensive introduction to boost python conv
 /** @file demo.py
  *  @brief Uses the demo module.
 */
-
-struct tagPyArrayObject;
-typedef tagPyArrayObject PyArrayObject;
+//
 
 namespace boost { namespace python { 
   
@@ -253,7 +249,7 @@ class arraytbase
 { 
 protected:
   object obj; // for reference counting
-  PyArrayObject* objptr;
+  PyObject* objptr;
  
   arraytbase(object const &a, int typesize);
   void construct(object const &a, int typesize);

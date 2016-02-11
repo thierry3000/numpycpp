@@ -188,22 +188,10 @@ void RegisterAllConvertersForType()
   from_arrayt<T>::Register();
 }
 
-
-PyArrayObject* getPyArrayObjectPtr(py::object &o)
-{
-  return reinterpret_cast<PyArrayObject*>(o.ptr());
-}
-
-const PyArrayObject* getPyArrayObjectPtr(const py::object &o)
-{
-  return reinterpret_cast<const PyArrayObject*>(o.ptr());
-}
-
 } // impl namespace
 
+#define CAST_TO_PPYARRAYOBJECT(p) ((PyArrayObject*)(p))
 
-
-using mw_py_impl::getPyArrayObjectPtr;
 
 void importNumpyAndRegisterTypes()
 {
@@ -254,7 +242,7 @@ int getItemtype(const object &a)
 { 
   if (PyArray_Check(a.ptr()))
   {
-    const PyArrayObject* p = getPyArrayObjectPtr(a);
+    const PyArrayObject* p = CAST_TO_PPYARRAYOBJECT(a.ptr());
     int t = PyArray_TYPE(p);
     return t;
   }
@@ -286,9 +274,9 @@ void arraytbase::construct(object const &a_, int typesize)
   if (!PyArray_Check(obj.ptr()))
     throw std::invalid_argument("arrayt: attempted construction with something that is not derived from ndarray");
   
-  objptr = getPyArrayObjectPtr(obj);
+  objptr = obj.ptr();
   
-  bool is_behaved = PyArray_ISBEHAVED(objptr);
+  bool is_behaved = PyArray_ISBEHAVED(CAST_TO_PPYARRAYOBJECT(objptr));
   if (!is_behaved)
     throw std::invalid_argument("arrayt: numpy array is not behaved");
 
@@ -299,52 +287,52 @@ void arraytbase::construct(object const &a_, int typesize)
 
 int arraytbase::itemtype() const
 {
-  return PyArray_TYPE(objptr);
+  return PyArray_TYPE(CAST_TO_PPYARRAYOBJECT(objptr));
 }
 
 int arraytbase::itemsize() const
 {
-  return PyArray_ITEMSIZE(objptr);
+  return PyArray_ITEMSIZE(CAST_TO_PPYARRAYOBJECT(objptr));
 }
 
 int arraytbase::rank() const
 {
-  return PyArray_NDIM(objptr);
+  return PyArray_NDIM(CAST_TO_PPYARRAYOBJECT(objptr));
 }
 
 const Py_ssize_t* arraytbase::shape() const
 {
-  return PyArray_DIMS(objptr);
+  return PyArray_DIMS(CAST_TO_PPYARRAYOBJECT(objptr));
 }
 
 
 const Py_ssize_t* arraytbase::strides() const
 {
-  return PyArray_STRIDES(objptr);
+  return PyArray_STRIDES(CAST_TO_PPYARRAYOBJECT(objptr));
 }
 
 
 bool arraytbase::isCContiguous() const
 {
-  return PyArray_IS_C_CONTIGUOUS(objptr);
+  return PyArray_IS_C_CONTIGUOUS(CAST_TO_PPYARRAYOBJECT(objptr));
 }
 
 
 bool arraytbase::isWriteable() const
 {
-  return PyArray_ISWRITEABLE(objptr);
+  return PyArray_ISWRITEABLE(CAST_TO_PPYARRAYOBJECT(objptr));
 }
 
 
 bool arraytbase::isFContiguous() const
 {
-  return PyArray_IS_F_CONTIGUOUS(objptr);
+  return PyArray_IS_F_CONTIGUOUS(CAST_TO_PPYARRAYOBJECT(objptr));
 }
 
 
 char* arraytbase::bytes()
 {
-  return PyArray_BYTES(objptr);
+  return PyArray_BYTES(CAST_TO_PPYARRAYOBJECT(objptr));
 }
 
 
