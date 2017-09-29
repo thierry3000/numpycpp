@@ -9,6 +9,8 @@ set(Python_ADDITIONAL_VERSIONS 2.7)
 find_package(PythonInterp REQUIRED)
 find_package(PythonLibs REQUIRED)
 find_package(Boost REQUIRED COMPONENTS "python")
+#since boost 1.63
+find_package(Boost REQUIRED COMPONENTS "numpy")
 find_package(NumPy REQUIRED)
 
 message(STATUS "PYTHON include dirs = ${PYTHON_INCLUDE_DIRS}")
@@ -26,9 +28,11 @@ add_library(numpycpp STATIC
 add_library(demo SHARED
             demo.cpp)
 
-add_dependencies(demo "${CMAKE_SOURCE_DIR}/demo.py")
-
-target_link_libraries(demo numpycpp ${Boost_PYTHON_LIBRARY_RELEASE} ${PYTHON_LIBRARIES})
+#message(STATUS "CMAKE_SOURCE_DIR: ${CMAKE_SOURCE_DIR}")
+#add_dependencies(demo "${CMAKE_SOURCE_DIR}/demo.py")
+message(STATUS "found Boost_PYTHON_LIBRARY:      ${Boost_PYTHON_LIBRARY}")
+message(STATUS "found Boost_NUMPY_LIBRARY:       ${Boost_NUMPY_LIBRARY}")
+target_link_libraries(demo numpycpp ${Boost_PYTHON_LIBRARY} ${Boost_NUMPY_LIBRARY} ${PYTHON_LIBRARIES} )
 
 add_custom_command(TARGET demo POST_BUILD
                    COMMAND ${CMAKE_COMMAND} -E create_symlink ${CMAKE_SOURCE_DIR}/demo.py ${CMAKE_BINARY_DIR}/demo.py)

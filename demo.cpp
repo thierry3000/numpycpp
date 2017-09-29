@@ -19,11 +19,12 @@
 #include <iostream> 
 #include <sstream>
 #include <boost/python/object.hpp>
+#include <boost/python/numpy.hpp>
 #include "numpy.hpp"
 
 namespace py = boost::python;
 namespace np = boost::python::numpy;
-namespace nm = boost::python::numeric;
+//namespace nm = boost::python::numeric;
 using namespace std;
 
 template<class T>
@@ -114,9 +115,9 @@ void printArrayInfo(const np::arraytbase &arr)
 }
 
 
-void printArray(nm::array pyarr, bool printContents)
+void printArray(np::ndarray pyarr, bool printContents)
 {
-  np::arraytbase arr(pyarr);
+  np::ndarray arr(pyarr);
   printArrayInfo(arr);
   
   handleType<PyObject*>(arr, printContents);
@@ -184,10 +185,13 @@ py::object SumArrayT(np::arrayt<float> arr1, np::arrayt<float>  arr2)
   return ret.getObject();
 }
 
-py::object SumNumericArray(nm::array arr1, nm::array arr2)
+py::object SumNumericArray(np::ndarray arr1, np::ndarray arr2)
 {
   const np::ssize_t len = py::extract<int>(py::getattr(arr1, "shape")[0]);
-  nm::array ret = py::extract<nm::array>(np::empty(1, &len, np::getItemtype(arr1)));
+  //nm::array ret = py::extract<nm::array>(np::empty(1, &len, np::getItemtype(arr1)));
+  py::tuple shape = py::make_tuple(1,len);
+  np::dtype dtype = np::dtype::get_builtin<float>();
+  np::ndarray ret = np::empty(shape,dtype);
   for (int i=0; i<len; ++i)
   {
     float x1 = py::extract<float>(arr1[i]);
