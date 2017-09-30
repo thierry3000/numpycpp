@@ -9,8 +9,11 @@ set(Python_ADDITIONAL_VERSIONS 2.7)
 find_package(PythonInterp REQUIRED)
 find_package(PythonLibs REQUIRED)
 find_package(Boost REQUIRED COMPONENTS "python")
+message("found Boost_VERSION: ${Boost_VERSION}")
 #since boost 1.63
-find_package(Boost REQUIRED COMPONENTS "numpy")
+if(${Boost_VERSION}>106300)
+  find_package(Boost REQUIRED COMPONENTS "numpy")
+endif()
 find_package(NumPy REQUIRED)
 
 message(STATUS "PYTHON include dirs = ${PYTHON_INCLUDE_DIRS}")

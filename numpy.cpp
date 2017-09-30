@@ -217,7 +217,9 @@ void importNumpyAndRegisterTypes()
   mw_py_impl::to_toarraytbase::Register();
   mw_py_impl::from_arraytbase::Register();
   
-  //py::numeric::array::set_module_and_type("numpy", "ndarray"); // use numpy
+#if BOOST_VERSION<106300
+  py::numeric::array::set_module_and_type("numpy", "ndarray"); // use numpy
+#endif
 }
 
 

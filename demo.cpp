@@ -19,12 +19,16 @@
 #include <iostream> 
 #include <sstream>
 #include <boost/python/object.hpp>
-#include <boost/python/numpy.hpp>
+#if BOOST_VERSION>106300
+  #include <boost/python/numpy.hpp>
+#endif
 #include "numpy.hpp"
 
 namespace py = boost::python;
 namespace np = boost::python::numpy;
-//namespace nm = boost::python::numeric;
+#if BOOST_VERSION<106300
+  namespace nm = boost::python::numeric;
+#endif
 using namespace std;
 
 template<class T>
@@ -114,7 +118,7 @@ void printArrayInfo(const np::arraytbase &arr)
   cout << arr.strides()[i] << endl;
 }
 
-
+#if BOOST_VERSION>106300
 void printArray(np::ndarray pyarr, bool printContents)
 {
   np::ndarray arr(pyarr);
@@ -137,7 +141,30 @@ void printArray(np::ndarray pyarr, bool printContents)
   handleType<unsigned long>(arr, printContents);
   handleType<unsigned long long>(arr, printContents);
 }
-
+#else
+void printArray(nm::array pyarr, bool printContents)
+{
+  np::arraytbase arr(pyarr);
+  printArrayInfo(arr);
+  
+  handleType<PyObject*>(arr, printContents);
+  handleType<float>(arr, printContents);
+  handleType<double>(arr, printContents);
+  
+  handleType<bool>(arr, printContents);
+  handleType<int>(arr, printContents);
+  handleType<short>(arr, printContents);
+  handleType<char>(arr, printContents);
+  handleType<long>(arr, printContents);
+  handleType<long long>(arr, printContents);
+  
+  handleType<unsigned int>(arr, printContents);
+  handleType<unsigned short>(arr, printContents);
+  handleType<unsigned char>(arr, printContents);
+  handleType<unsigned long>(arr, printContents);
+  handleType<unsigned long long>(arr, printContents);
+}
+#endif
 
 template<class T>
 void printConvertedArray(np::arrayt<T> arr)
@@ -185,10 +212,11 @@ py::object SumArrayT(np::arrayt<float> arr1, np::arrayt<float>  arr2)
   return ret.getObject();
 }
 
-py::object SumNumericArray(np::ndarray arr1, np::ndarray arr2)
+#if BOOST_VERSION>106300
+py::object SumNumericArray(np::ndarray arr1, nm::array arr2)
 {
-  const np::ssize_t len = py::extract<int>(py::getattr(arr1, "shape")[0]);
   //nm::array ret = py::extract<nm::array>(np::empty(1, &len, np::getItemtype(arr1)));
+  const np::ssize_t len = py::extract<int>(py::getattr(arr1, "shape")[0]);
   py::tuple shape = py::make_tuple(1,len);
   np::dtype dtype = np::dtype::get_builtin<float>();
   np::ndarray ret = np::empty(shape,dtype);
@@ -200,11 +228,32 @@ py::object SumNumericArray(np::ndarray arr1, np::ndarray arr2)
   }
   return ret;
 }
-
+#else
+py::object SumNumericArray(nm::array arr1, nm::array arr2)
+{
+  const np::ssize_t len = py::extract<int>(py::getattr(arr1, "shape")[0]);
+  nm::array ret = py::extract<nm::array>(np::empty(1, &len, np::getItemtype(arr1)));
+  //py::tuple shape = py::make_tuple(1,len);
+  //np::dtype dtype = np::dtype::get_builtin<float>();
+  //np::ndarray ret = np::empty(shape,dtype);
+  for (int i=0; i<len; ++i)
+  {
+    float x1 = py::extract<float>(arr1[i]);
+    float x2 = py::extract<float>(arr2[i]);
+    ret[i] = py::object(x1 + x2);
+  }
+  return ret;
+}
+#endif
 
 
 BOOST_PYTHON_MODULE(libdemo)
 {
+#if BOOST_VERSION>106300
+  cout<<"new boost numpy support detected"<<endl;
+#else
+  cout<<"NO boost numpy support detected"<<endl;
+#endif
   np::importNumpyAndRegisterTypes();
   py::def("printArray", printArray);
   py::def("printConvertedArray_int", printConvertedArray<int>);
