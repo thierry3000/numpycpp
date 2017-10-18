@@ -9,10 +9,11 @@ set(Python_ADDITIONAL_VERSIONS 2.7)
 find_package(PythonInterp REQUIRED)
 find_package(PythonLibs REQUIRED)
 find_package(Boost REQUIRED COMPONENTS "python")
+
 message("found Boost_VERSION: ${Boost_VERSION}")
 #since boost 1.63
-if(Boost_VERSION GREATER_EQUAL 106500)
-  message(STATUS "new boost_numpy detected")
+if(Boost_VERSION GREATER 106500)
+  message(STATUS "New boost_numpy detected, no need to use this piece of code!")
   find_package(Boost REQUIRED COMPONENTS "numpy")
 endif()
 find_package(NumPy REQUIRED)
@@ -25,19 +26,22 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC")
 
 include_directories(${PYTHON_INCLUDE_DIRS} ${PYTHON_NUMPY_INCLUDE_DIR})
 include_directories(.)
-                   
-add_library(numpycpp STATIC
-	    numpy.cpp)
 
-add_library(demo SHARED
-            demo.cpp)
+if(Boost_VERSION LESS 106500)
+  add_library(numpycpp STATIC numpy.cpp)
+  add_library(demo SHARED demo.cpp)
+else()
+  add_library(demo SHARED demo_boost_numpy.cpp)
+endif()
+
+
 
 #message(STATUS "CMAKE_SOURCE_DIR: ${CMAKE_SOURCE_DIR}")
 #add_dependencies(demo "${CMAKE_SOURCE_DIR}/demo.py")
 message(STATUS "found Boost_PYTHON_LIBRARY:      ${Boost_PYTHON_LIBRARY}")
 message(STATUS "found Boost_LIBRARIES:       ${Boost_LIBRARIES}")
 
-if(Boost_VERSION GREATER_EQUAL 106500)
+if(Boost_VERSION GREATER 106500)
   target_link_libraries(demo boost_python boost_numpy )
 else()
   target_link_libraries(demo numpycpp ${Boost_LIBRARIES} ${PYTHON_LIBRARIES} )
@@ -45,5 +49,7 @@ endif()
 add_custom_command(TARGET demo POST_BUILD
                    COMMAND ${CMAKE_COMMAND} -E create_symlink ${CMAKE_SOURCE_DIR}/demo.py ${CMAKE_BINARY_DIR}/demo.py)
 
-install(TARGETS numpycpp ARCHIVE DESTINATION lib)
-install(FILES numpy.hpp DESTINATION include)
+if(Boost_VERSION LESS 106500)
+  install(TARGETS numpycpp ARCHIVE DESTINATION lib)
+  install(FILES numpy.hpp DESTINATION include)
+endif()
